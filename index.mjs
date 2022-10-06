@@ -21,9 +21,10 @@ async function getLogs(apiInstance, params) {
         console.log(`Requesting page ${++n} ${nextPage ? `with cursor ${nextPage} ` : ``}`);
         const query = nextPage ? { ...params, pageCursor: nextPage } : params;
         const result = await apiInstance.listLogsGet(query);
-        data.push(...result.data);
+        fs.writeFileSync(`${argv.from}/${('0000000'+n).slice(-7)}.json`, JSON.stringify(result.data, null, 2));
         nextPage = result?.meta?.page?.after;
-        console.log(`${result.data.length} results (${data.length} total)`);
+        console.log(`${result.data.length} results`);
+        await new Promise(resolve => setTimeout(resolve, 12000)); //Wait 12 seconds to not get rate limited (rate limit is 300 per hour)
     } while (nextPage);
 
     return data;
@@ -37,7 +38,7 @@ const initialParams = {
     filterQuery: argv.query,
     filterIndex: argv.index ?? "main",
     filterFrom: argv.from ? new Date(argv.from) : oneYearAgo(),
-    filterTo: argv.top ? new Date(argv.to) : new Date(),
+    filterTo: argv.to ? new Date(argv.to) : new Date(),
     pageLimit: argv.pageSize ? Math.min(argv.pageSize, 5000) : 1000,
 };
 
@@ -51,15 +52,12 @@ console.log(chalk.cyan("Downloading logs:\n" + JSON.stringify(initialParams, nul
 (async function () {
     let data;
     try {
+        fs.mkdirSync(argv.from);
         data = await getLogs(apiInstance, initialParams);
     } catch (e) {
         console.log(chalk.red(e.message));
         process.exit(1);
     }
-
-    const outputFile = argv.output ?? "results.json";
-    console.log(chalk.cyan(`\nWriting ${data.length} logs to ${outputFile}`));
-    fs.writeFileSync(outputFile, JSON.stringify(data, null, 2));
 
     console.log(chalk.green("Done!"));
 })();
